@@ -17,7 +17,7 @@ usermap = {}
 
 modifiedNames = {}
 
-filepath = './userlist'
+filepath = '/arlogs/userlist'
 
 lastTime = 0
 

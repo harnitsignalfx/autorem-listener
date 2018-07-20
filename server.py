@@ -13,7 +13,7 @@ else:
     print ('SF_TOKEN env variable not found')
     sys.exit(0)
 
-filepath = './userlist'
+filepath = '/arlogs/userlist'
 
 endpoint = 'https://ingest.signalfx.com/'
 token = os.environ['SF_TOKEN']
