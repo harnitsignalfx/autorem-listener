@@ -1,10 +1,5 @@
 import os
-import asyncio
 import time
-import signalfx
-import random
-import uuid
-import aiofiles
 import pdb
 import sys
 import fcntl
