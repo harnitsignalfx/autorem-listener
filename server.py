@@ -15,7 +15,13 @@ else:
 
 filepath = '/arlogs/userlist'
 
-endpoint = 'https://ingest.signalfx.com'
+realm = 'us0'
+
+if 'REALM' in os.environ:
+    realm = os.environ['REALM']
+
+endpoint = 'https://ingest.'+realm+'.signalfx.com'
+
 token = os.environ['SF_TOKEN']
 
 @app.route('/health', methods=['POST'])
