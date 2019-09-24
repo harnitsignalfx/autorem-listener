@@ -24,14 +24,16 @@ endpoint = 'https://ingest.'+realm+'.signalfx.com'
 
 token = os.environ['SF_TOKEN']
 
+send_metric = {}
+metric_content = {}
+metric_content['metric'] = 'autorem-listener.heartbeat'
+metric_content['value'] = 1
+send_metric['counter'] = [metric_content]
+
 @app.route('/healthz')
 def health():
+    global send_metric
     headers = {'X-SF-TOKEN' : token,'Content-Type' : 'application/json'}
-    send_metric = {}
-    metric_content = {}
-    metric_content['metric']='autorem-listener.heartbeat'
-    metric_content['value']=1
-    send_metric['counter'] = [metric_content] 
     r = requests.post(endpoint+'/v2/datapoint',headers=headers,data=json.dumps(send_metric))
     return "OK"
 
