@@ -4,6 +4,9 @@ import requests
 import os
 import writeFile
 import sys
+import signalfx
+
+
 
 app = Flask(__name__)
 
@@ -24,34 +27,29 @@ endpoint = 'https://ingest.'+realm+'.signalfx.com'
 
 token = os.environ['SF_TOKEN']
 
-send_metric = {}
-metric_content = {}
-metric_content['metric'] = 'autorem-listener.heartbeat'
-metric_content['value'] = 1
-send_metric['counter'] = [metric_content]
+sfx = signalfx.SignalFx(ingest_endpoint=endpoint).ingest(token)
+
 
 @app.route('/healthz')
 def health():
-    global send_metric
-    headers = {'X-SF-TOKEN' : token,'Content-Type' : 'application/json'}
-    r = requests.post(endpoint+'/v2/datapoint',headers=headers,data=json.dumps(send_metric))
+    sfx.send(
+        counters=[
+          {
+            'metric': 'autorem-listener.heartbeat',
+            'value': 1
+          }])
     return "OK"
+
+
 
 @app.route('/health', methods=['POST'])
 def healthCheck():
     '''Sends dummy event'''
-
-    #headers = {'X-SF-TOKEN' : os.environ['SF_TOKEN'],'Content-Type' : 'application/json'}
-    headers = {'X-SF-TOKEN' : token,'Content-Type' : 'application/json'}
     
-    send_event = {}
-    send_event['category']='USER_DEFINED'
-    send_event['eventType']='Health Check'
-    send_event['properties']={'status':'OK'}
-    send_event = [send_event]
-    print (json.dumps(send_event,indent=2))   
-    r = requests.post(endpoint+'/v2/event',headers=headers,data=json.dumps(send_event))
-    print(r.text)
+    sfx.send_event(
+        event_type='Health Check',
+        properties={
+            'status': 'OK'})
 
     return "OK"
 
@@ -62,22 +60,18 @@ def healthCheckWithUser(username):
     headers = {'X-SF-TOKEN' : token,'Content-Type' : 'application/json'}
     print('Received Health Check for - ',username)
 
-    send_event = {}
-    send_event['category']='USER_DEFINED'
-    send_event['eventType']='Health Check'
-    send_event['properties']={'user':username,'status':'OK'}
-    send_event = [send_event]
-    print (json.dumps(send_event,indent=2))   
-    r = requests.post(endpoint+'/v2/event',headers=headers,data=json.dumps(send_event))
-    return(r.text)
+
+    sfx.send_event(
+        event_type='Health Check',
+        properties={
+            'status': 'OK',
+            'user': username})
 
     return "OK" 
 
 @app.route('/write', methods=['POST'])
 def write():
     
-    #headers = {'X-SF-TOKEN' : os.environ['SF_TOKEN'],'Content-Type' : 'application/json'}
-    headers = {'X-SF-TOKEN' : token,'Content-Type' : 'application/json'}
     data = json.loads(request.data.decode('utf-8'))
     if ('messageBody' in data) and ('status' in data):
       if not (data['status'].lower()=='anomalous'):  
@@ -93,53 +87,42 @@ def write():
         username = body[3]
         writeFile.modifyFile(filepath,username,'rollback')
 
-        send_event = {}
-        send_event['category']='USER_DEFINED'
-        send_event['eventType']='Automated Rollback initiated'
-        send_event['properties']={'user':username}
-        send_event = [send_event]
-        print (json.dumps(send_event,indent=2))   
-        r = requests.post(endpoint+'/v2/event',headers=headers,data=json.dumps(send_event))
-        print(r.text)
+        sfx.send_event(
+        event_type='Automated Rollback initiated',
+        properties={
+            'user': username})
 
       elif 'Deployment' == body[1]:
         username = body[3]
         writeFile.modifyFile(filepath,username,'deploy')
 
-        send_event = {}
-        send_event['category']='USER_DEFINED'
-        send_event['eventType']='Automated Deployment initiated'
-        send_event['properties']={'user':username}
-        send_event = [send_event]
-        print (json.dumps(send_event,indent=2))   
-        r = requests.post(endpoint+'/v2/event',headers=headers,data=json.dumps(send_event))
-        print(r.text)
+        sfx.send_event(
+        event_type='Automated Deployment initiated',
+        properties={
+            'user': username})
     
     return "OK"
 
 @app.route('/write/<string:username>/<int:batchsize>', methods=['POST'])
 def writeSize(username,batchsize):
     
-    #headers = {'X-SF-TOKEN' : os.environ['SF_TOKEN'],'Content-Type' : 'application/json'}
-    headers = {'X-SF-TOKEN' : token,'Content-Type' : 'application/json'}
     print('Received - ',username,' ',batchsize)
     if batchsize > 30000:
       writeFile.modifyFile(filepath,username,'bcanary')
     else:
       writeFile.modifyFile(filepath,username,'gcanary')
 
-    send_event = {}
-    send_event['category']='USER_DEFINED'
-    send_event['eventType']='canary push event'
-    send_event['properties']={'user':username}
-    send_event = [send_event]
-    print (json.dumps(send_event,indent=2))   
-    r = requests.post(endpoint+'/v2/event',headers=headers,data=json.dumps(send_event))
-    return(r.text)
+    sfx.send_event(
+        event_type='canary push event',
+        properties={
+            'user': username})
 
     return "OK"    
 
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=6000)
+    try:
+        app.run(host='0.0.0.0', port=6000)
+    finally:
+        sfx.stop()
